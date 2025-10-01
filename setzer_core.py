@@ -325,9 +325,19 @@ def make_chunks(cues: List[Cue], max_chars: int) -> List[Chunk]:
     cid = 1
     char_total = 0
     start_pos = 0
+    cue_total = 0
+    max_cues_per_chunk = max(5, max_chars // 80)
     for pos, cue in enumerate(cues):
-        text_len = len(cue.text)
+        text_len = len(cue.text) + cue.text.count("\n")
+        text_len += len(str(cue.index)) + len(cue.start) + len(cue.end) + 5
+        if not text_len:
+            text_len = 1
+        needs_split = False
         if char_total and char_total + text_len > max_chars:
+            needs_split = True
+        if cue_total and cue_total >= max_cues_per_chunk:
+            needs_split = True
+        if needs_split:
             chunks.append(
                 Chunk(
                     cid=cid,
@@ -339,7 +349,9 @@ def make_chunks(cues: List[Cue], max_chars: int) -> List[Chunk]:
             cid += 1
             start_pos = pos
             char_total = 0
+            cue_total = 0
         char_total += text_len
+        cue_total += 1
     if cues:
         chunks.append(
             Chunk(
@@ -431,8 +443,10 @@ def _extract_stream_piece(payload: Dict[str, object]) -> str:
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _BRACKET_RE = re.compile(r"\[[^\]]+\]")
-
-
+_TIMECODE_LINE_RE = re.compile(
+    r"^\s*\[?\d{1,2}:\d{2}:\d{2}(?:[,.]\d{1,3})?\s*-->\s*"
+    r"\d{1,2}:\d{2}:\d{2}(?:[,.]\d{1,3})?\]?\s*$"
+)
 def _protect_tags(text: str) -> Tuple[str, Dict[str, str]]:
     mapping: Dict[str, str] = {}
     counter = 0
@@ -463,6 +477,61 @@ def _restore_placeholders(text: str, mapping: Dict[str, str]) -> str:
     for placeholder, value in mapping.items():
         text = text.replace(placeholder, value)
     return text
+
+
+_INLINE_MARKER_RE = re.compile(
+    r"^\s*(?:CUE|OUTPUT|TRANSLATION|TRANSLATED|RESPONSE|ANSWER)\s*:\s*(.*)$",
+    re.IGNORECASE,
+)
+
+
+def _cleanup_translation(text: str) -> str:
+    if not text:
+        return text
+
+    cleaned = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+
+    lines = cleaned.split("\n")
+    output: List[str] = []
+    for line in lines:
+        marker_match = _INLINE_MARKER_RE.match(line)
+        if marker_match:
+            output = []  # Drop everything seen before the marker
+            remainder = marker_match.group(1)
+            if remainder:
+                output.append(remainder)
+            continue
+        if _TIMECODE_LINE_RE.match(line.strip()):
+            continue
+        output.append(line)
+
+    trailing_blank_lines = 0
+    for line in reversed(output):
+        if line.strip():
+            break
+        trailing_blank_lines += 1
+
+    collapsed: List[str] = []
+    blank_run = False
+    for line in output:
+        if line.strip():
+            collapsed.append(line)
+            blank_run = False
+        else:
+            if collapsed and not blank_run:
+                collapsed.append("")
+            blank_run = True
+
+    output = collapsed
+    while output and not output[0].strip():
+        output.pop(0)
+    while output and not output[-1].strip():
+        output.pop()
+
+    result = "\n".join(output)
+    if trailing_blank_lines == 1 and cleaned.endswith(("\n", "\r")) and result:
+        result += "\n"
+    return result
 
 
 def llm_translate_single(
@@ -512,9 +581,10 @@ def llm_translate_single(
 
     if not raw_result:
         return text
-    if not raw_result.strip():
+    cleaned = _cleanup_translation(raw_result)
+    if not cleaned.strip():
         return text
-    return _restore_placeholders(raw_result, {**tag_map, **bracket_map})
+    return _restore_placeholders(cleaned, {**tag_map, **bracket_map})
 
 
 def llm_translate_batch(
@@ -582,7 +652,11 @@ def llm_translate_batch(
         if translated is None:
             restored = _restore_placeholders(prepared, {**tag_map, **bracket_map})
         else:
-            restored = _restore_placeholders(translated, {**tag_map, **bracket_map})
+            cleaned = _cleanup_translation(translated)
+            if not cleaned.strip():
+                restored = _restore_placeholders(prepared, {**tag_map, **bracket_map})
+            else:
+                restored = _restore_placeholders(cleaned, {**tag_map, **bracket_map})
         output.append((pid, restored))
     return output
 

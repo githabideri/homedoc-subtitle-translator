@@ -216,6 +216,102 @@ class TranslationWhitespaceTests(unittest.TestCase):
 
         self.assertEqual(translated_pairs, [("1", "  Salut  "), ("2", "Monde")])
 
+    def test_llm_translate_single_strips_leading_markers(self):
+        with mock.patch(
+            "setzer_core._perform_llm_call",
+            return_value="CUE:\nBonjour",
+        ):
+            translated = setzer_core.llm_translate_single(
+                "Hello",
+                source="en",
+                target="fr",
+                model="gemma",
+                server="http://example",
+                translate_bracketed=True,
+                llm_mode="chat",
+                stream=False,
+                timeout=10,
+            )
+
+        self.assertEqual(translated, "Bonjour")
+
+    def test_llm_translate_batch_strips_inline_markers(self):
+        response = "1|||Translation: Salut\n2|||OUTPUT: Monde\n"
+
+        with mock.patch(
+            "setzer_core._perform_llm_call",
+            return_value=response,
+        ):
+            translated_pairs = setzer_core.llm_translate_batch(
+                [("1", "Hello"), ("2", "World")],
+                source="en",
+                target="fr",
+                model="gemma",
+                server="http://example",
+                llm_mode="chat",
+                stream=False,
+                timeout=10,
+                translate_bracketed=True,
+            )
+
+        self.assertEqual(translated_pairs, [("1", "Salut"), ("2", "Monde")])
+
+    def test_llm_translate_single_drops_content_before_marker(self):
+        with mock.patch(
+            "setzer_core._perform_llm_call",
+            return_value="Original text\nTranslation:\nBonjour",
+        ):
+            translated = setzer_core.llm_translate_single(
+                "Hello",
+                source="en",
+                target="fr",
+                model="gemma",
+                server="http://example",
+                translate_bracketed=True,
+                llm_mode="chat",
+                stream=False,
+                timeout=10,
+            )
+
+        self.assertEqual(translated, "Bonjour")
+
+    def test_llm_translate_single_trims_outer_blank_lines(self):
+        with mock.patch(
+            "setzer_core._perform_llm_call",
+            return_value="\n\nSalut\n\n",
+        ):
+            translated = setzer_core.llm_translate_single(
+                "Hello",
+                source="en",
+                target="fr",
+                model="gemma",
+                server="http://example",
+                translate_bracketed=True,
+                llm_mode="chat",
+                stream=False,
+                timeout=10,
+            )
+
+        self.assertEqual(translated, "Salut")
+
+    def test_cleanup_translation_drops_timecode_lines(self):
+        text = "Line one\n[00:00:01,000 --> 00:00:02,000]\nLine two"
+        self.assertEqual(setzer_core._cleanup_translation(text), "Line one\nLine two")
+
+    def test_cleanup_translation_collapses_extra_blank_lines(self):
+        text = "First\n\n\nSecond"
+        self.assertEqual(setzer_core._cleanup_translation(text), "First\n\nSecond")
+
+
+class MakeChunksTests(unittest.TestCase):
+    def test_make_chunks_limits_short_cues_by_count(self):
+        cues = [Cue(index=i + 1, start="0", end="1", text="a") for i in range(20)]
+        chunks = setzer_core.make_chunks(cues, max_chars=50)
+        self.assertGreater(len(chunks), 1)
+        for chunk in chunks:
+            count = chunk.end_idx - chunk.start_idx + 1
+            self.assertLessEqual(count, 5)
+
 
 if __name__ == "__main__":
     unittest.main()

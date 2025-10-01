@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import datetime as dt
-import os
 import queue
+import re
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -26,7 +26,8 @@ class App:
         root.title("homedoc-subtitle-translator")
 
         self.input_var = tk.StringVar()
-        self.output_var = tk.StringVar()
+        default_output = Path.cwd() / "results"
+        self.output_var = tk.StringVar(value=str(default_output))
         self.source_var = tk.StringVar(value="auto")
         self.target_var = tk.StringVar(value="English")
         self.server_var = tk.StringVar(value="http://127.0.0.1:11434")
@@ -43,6 +44,7 @@ class App:
         self.chunks: List[Chunk] = []
         self.abort_event = threading.Event()
         self.worker: Optional[threading.Thread] = None
+        self.input_path: Optional[Path] = None
 
         self._build_layout()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -138,6 +140,7 @@ class App:
             self.log(f"Failed to load transcript: {exc}")
             messagebox.showerror("Error", str(exc))
             return
+        self.input_path = Path(input_path)
         self.transcript = transcript
         self.chunks = chunks
         self.chunk_list.delete(0, tk.END)
@@ -227,8 +230,8 @@ class App:
 
     def _write_outputs(self, output_dir: Path, flat: bool, model_tag: str) -> None:
         assert self.transcript is not None
-        target = self._resolve_output_directory(output_dir, flat)
         timestamp = dt.datetime.now(dt.timezone.utc).astimezone()
+        target = self._resolve_output_directory(output_dir, flat, model_tag, timestamp)
         note = f"translated-with model={model_tag} time={timestamp.isoformat()}"
         content = build_output(self.transcript, vtt_note=note if self.transcript.fmt == "vtt" else None)
         filename = self._output_filename(self.transcript.fmt)
@@ -239,28 +242,52 @@ class App:
         except OSError as exc:
             self.log(f"Unable to write output: {exc}")
 
-    def _resolve_output_directory(self, base: Path, flat: bool) -> Path:
+    def _resolve_output_directory(
+        self, base: Path, flat: bool, model_tag: str, timestamp: dt.datetime
+    ) -> Path:
+        base.mkdir(parents=True, exist_ok=True)
         if flat:
-            base.mkdir(parents=True, exist_ok=True)
             return base
-        env_tz = os.getenv("HOMEDOC_TZ")
-        now = dt.datetime.now()
-        if env_tz:
-            try:
-                from zoneinfo import ZoneInfo
-
-                tz = ZoneInfo(env_tz)
-                now = dt.datetime.now(tz)
-            except Exception:
-                pass
-        folder = now.strftime("%Y%m%d-%H%M%S")
+        if self.input_path is not None:
+            orig = self.input_path.stem
+        elif self.transcript is not None and self.transcript.cues:
+            orig = f"job-{self.transcript.cues[0].index}"
+        else:
+            orig = "job"
+        orig_slug = self._slugify(orig)
+        model_slug = self._slugify(model_tag or "model")
+        lang_slug = self._language_code()
+        stamp = timestamp.strftime("%Y%m%d-%H%M%S")
+        folder = f"{orig_slug}_{stamp}_{model_slug}_{lang_slug}"
         target = base / folder
         target.mkdir(parents=True, exist_ok=True)
         return target
 
     def _output_filename(self, fmt: str) -> str:
-        mapping = {"srt": "report.srt", "vtt": "report.vtt", "tsv": "report.tsv"}
-        return mapping.get(fmt, "report.txt")
+        if self.input_path is not None:
+            base = self.input_path.stem
+        elif self.transcript is not None and self.transcript.cues:
+            base = f"job-{self.transcript.cues[0].index}"
+        else:
+            base = "output"
+        lang = self._language_code()
+        ext_map = {"srt": ".srt", "vtt": ".vtt", "tsv": ".tsv"}
+        ext = ext_map.get(fmt, ".txt")
+        suffix = f"_{lang}" if lang else ""
+        return f"{self._slugify(base)}{suffix}{ext}"
+
+    def _language_code(self) -> str:
+        target = self.target_var.get().strip()
+        if not target:
+            return "unknown"
+        return self._slugify(target).lower() or "unknown"
+
+    @staticmethod
+    def _slugify(text: str) -> str:
+        cleaned = re.sub(r"[\s]+", "_", text.strip())
+        cleaned = re.sub(r"[^0-9A-Za-z._-]", "-", cleaned)
+        cleaned = re.sub(r"[-_]{2,}", "_", cleaned)
+        return cleaned.strip("_-.") or "unnamed"
 
     def abort(self) -> None:
         self.abort_event.set()
