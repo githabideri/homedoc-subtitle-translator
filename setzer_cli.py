@@ -67,6 +67,10 @@ def _build_parser() -> argparse.ArgumentParser:
     mode_default = _env_value("HOMEDOC_LLM_MODE", "auto")
     stream_default = _env_bool("HOMEDOC_STREAM", True)
     timeout_default = float(_env_value("HOMEDOC_HTTP_TIMEOUT", "60"))
+    try:
+        cues_default = int(_env_value("HOMEDOC_CUES_PER_REQUEST", "1"))
+    except ValueError:
+        cues_default = 1
 
     parser = argparse.ArgumentParser(
         description="Translate subtitle files using a local Ollama-compatible LLM.",
@@ -88,10 +92,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source", default="auto", help="Source language (default: %(default)s)")
     parser.add_argument("--target", default="English", help="Target language (default: %(default)s)")
     parser.add_argument(
+        "--cues-per-request",
         "--batch-per-chunk",
+        dest="cues_per_request",
         type=int,
-        default=1,
-        help="Number of cues to send per LLM request (default: %(default)s)",
+        default=cues_default,
+        help="Number of subtitle cues to send per LLM request (default: %(default)s)",
     )
     parser.add_argument(
         "--max-chars",
@@ -233,7 +239,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             model=args.model,
             source=args.source,
             target=args.target,
-            batch_n=args.batch_per_chunk,
+            batch_n=args.cues_per_request,
             translate_bracketed=args.translate_bracketed,
             llm_mode=args.llm_mode,
             stream=args.stream,

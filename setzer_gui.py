@@ -32,7 +32,7 @@ class App:
         self.target_var = tk.StringVar(value="English")
         self.server_var = tk.StringVar(value="http://127.0.0.1:11434")
         self.model_var = tk.StringVar(value="gemma3:12b")
-        self.batch_var = tk.IntVar(value=1)
+        self.cues_per_request_var = tk.IntVar(value=1)
         self.max_chars_var = tk.IntVar(value=4000)
         self.bracket_var = tk.BooleanVar(value=True)
         self.stream_var = tk.BooleanVar(value=True)
@@ -74,7 +74,8 @@ class App:
         add_row("Target", tk.Entry(frame, textvariable=self.target_var), 3)
         add_row("Server", tk.Entry(frame, textvariable=self.server_var), 4)
         add_row("Model", tk.Entry(frame, textvariable=self.model_var), 5)
-        add_row("Batch/chunk", tk.Entry(frame, textvariable=self.batch_var), 6)
+        cues_spin = tk.Spinbox(frame, from_=1, to=50, textvariable=self.cues_per_request_var, width=6)
+        add_row("Cues/request", cues_spin, 6)
         add_row("Max chars", tk.Entry(frame, textvariable=self.max_chars_var), 7)
 
         options_frame = tk.Frame(frame)
@@ -179,9 +180,12 @@ class App:
     def _start_worker(self, subset: List[Chunk]) -> None:
         self.abort_event.clear()
         try:
-            batch_n = max(1, int(self.batch_var.get()))
+            batch_n = max(1, int(self.cues_per_request_var.get()))
         except (TypeError, ValueError):
-            messagebox.showerror("Invalid batch size", "Batch per chunk must be an integer >= 1.")
+            messagebox.showerror(
+                "Invalid batch size",
+                "Cues per request must be an integer >= 1.",
+            )
             return
         args = dict(
             server=self.server_var.get().strip(),

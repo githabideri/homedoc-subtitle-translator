@@ -12,7 +12,7 @@ available through the `homedoc-subtitle-translator` alias as well.
 | `--flat` / `--no-flat` | bool | `--no-flat` | – | Write directly into `--out` or into a timestamped subfolder. |
 | `--source` | text | `auto` | – | Source language hint. |
 | `--target` | text | `English` | – | Target language. |
-| `--batch-per-chunk` | int | `1` | – | Number of cues per LLM request when chunking. |
+| `--cues-per-request` / `--batch-per-chunk` | int | `1` | `HOMEDOC_CUES_PER_REQUEST` | Subtitle cues per LLM request. |
 | `--max-chars` | int | `4000` | – | Planning size for chunk generation. |
 | `--no-translate-bracketed` | bool | disabled | – | Preserve bracketed tags such as `[MUSIC]`. |
 | `--server` | URL | `http://127.0.0.1:11434` | `HOMEDOC_LLM_SERVER` | Ollama-compatible server URL. |
@@ -52,7 +52,7 @@ setzer --in talk.vtt --out ./translated --flat
 ### Batch mode
 
 ```bash
-setzer --in lessons.srt --out ./translated --batch-per-chunk 8 --max-chars 6000
+setzer --in lessons.srt --out ./translated --cues-per-request 8 --max-chars 6000
 ```
 
 ### Preserve bracketed tags
