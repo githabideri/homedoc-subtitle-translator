@@ -4,6 +4,7 @@ from __future__ import annotations
 import datetime as dt
 import queue
 import re
+import shlex
 import threading
 import tkinter as tk
 from pathlib import Path
@@ -38,6 +39,7 @@ class App:
         self.stream_var = tk.BooleanVar(value=True)
         self.flat_var = tk.BooleanVar(value=False)
         self.no_llm_var = tk.BooleanVar(value=False)
+        self.cli_preview_var = tk.StringVar()
 
         self.log_queue: "queue.Queue[str]" = queue.Queue()
         self.transcript: Optional[Transcript] = None
@@ -45,8 +47,11 @@ class App:
         self.abort_event = threading.Event()
         self.worker: Optional[threading.Thread] = None
         self.input_path: Optional[Path] = None
+        self._trace_tokens: List[str] = []
 
         self._build_layout()
+        self._register_variable_traces()
+        self._update_cli_preview()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(150, self._drain_logs)
 
@@ -99,6 +104,80 @@ class App:
         self.console = scrolledtext.ScrolledText(frame, height=12, state=tk.DISABLED)
         self.console.grid(row=11, column=0, columnspan=3, sticky="nsew")
         frame.rowconfigure(11, weight=2)
+
+        preview_label = tk.Label(frame, text="CLI preview")
+        preview_label.grid(row=12, column=0, sticky="w", pady=(6, 0))
+        preview_entry = tk.Entry(
+            frame,
+            textvariable=self.cli_preview_var,
+            state="readonly",
+        )
+        preview_entry.grid(row=12, column=1, columnspan=2, sticky="ew", pady=(6, 0))
+
+    def _register_variable_traces(self) -> None:
+        variables: List[tk.Variable] = [
+            self.input_var,
+            self.output_var,
+            self.source_var,
+            self.target_var,
+            self.server_var,
+            self.model_var,
+            self.cues_per_request_var,
+            self.max_chars_var,
+            self.bracket_var,
+            self.stream_var,
+            self.flat_var,
+            self.no_llm_var,
+        ]
+        for var in variables:
+            token = var.trace_add("write", self._update_cli_preview)
+            self._trace_tokens.append(token)
+
+    def _update_cli_preview(self, *_: object) -> None:
+        self.cli_preview_var.set(self._format_cli_command())
+
+    def _format_cli_command(self) -> str:
+        args: List[str] = ["python", "-m", "setzer_cli"]
+
+        input_path = self.input_var.get().strip() or "<input.srt>"
+        output_dir = self.output_var.get().strip() or "<output-directory>"
+        args.extend(["--in", input_path])
+        args.extend(["--out", output_dir])
+
+        source = self.source_var.get().strip() or "auto"
+        target = self.target_var.get().strip() or "English"
+        server = self.server_var.get().strip() or "http://127.0.0.1:11434"
+        model = self.model_var.get().strip() or "gemma3:12b"
+        cues = max(1, int(self.cues_per_request_var.get() or 1))
+        max_chars = max(1, int(self.max_chars_var.get() or 4000))
+
+        args.extend(["--source", source])
+        args.extend(["--target", target])
+        args.extend(["--server", server])
+        args.extend(["--model", model])
+        args.extend(["--cues-per-request", str(cues)])
+        args.extend(["--max-chars", str(max_chars)])
+
+        if self.flat_var.get():
+            args.append("--flat")
+        else:
+            args.append("--no-flat")
+
+        if not self.bracket_var.get():
+            args.append("--no-translate-bracketed")
+
+        if self.stream_var.get():
+            args.append("--stream")
+        else:
+            args.append("--no-stream")
+
+        args.extend(["--llm-mode", "auto"])
+        args.extend(["--timeout", "60"])
+
+        if self.no_llm_var.get():
+            args.append("--no-llm")
+
+        return shlex.join(args)
 
     def _browse_input(self) -> None:
         filename = filedialog.askopenfilename(filetypes=[("Subtitles", "*.srt *.vtt *.tsv"), ("All", "*.*")])
