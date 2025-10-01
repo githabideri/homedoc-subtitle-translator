@@ -431,12 +431,6 @@ def _extract_stream_piece(payload: Dict[str, object]) -> str:
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _BRACKET_RE = re.compile(r"\[[^\]]+\]")
-_LEADING_MARKER_RE = re.compile(
-    r"^\s*(?:CUE|OUTPUT|TRANSLATION|TRANSLATED|RESPONSE|ANSWER)\s*:\s*",
-    re.IGNORECASE,
-)
-
-
 def _protect_tags(text: str) -> Tuple[str, Dict[str, str]]:
     mapping: Dict[str, str] = {}
     counter = 0
@@ -469,19 +463,41 @@ def _restore_placeholders(text: str, mapping: Dict[str, str]) -> str:
     return text
 
 
+_INLINE_MARKER_RE = re.compile(
+    r"^\s*(?:CUE|OUTPUT|TRANSLATION|TRANSLATED|RESPONSE|ANSWER)\s*:\s*(.*)$",
+    re.IGNORECASE,
+)
+
+
 def _cleanup_translation(text: str) -> str:
     if not text:
         return text
 
-    cleaned = text.lstrip("\ufeff")
-    match = _LEADING_MARKER_RE.match(cleaned)
-    if match:
-        cleaned = cleaned[match.end():]
-        if cleaned.startswith("\r\n"):
-            cleaned = cleaned[2:]
-        elif cleaned.startswith("\n"):
-            cleaned = cleaned[1:]
-    return cleaned
+    cleaned = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
+
+    lines = cleaned.split("\n")
+    output: List[str] = []
+    trimmed_trailing = 0
+    for line in lines:
+        marker_match = _INLINE_MARKER_RE.match(line)
+        if marker_match:
+            output = []  # Drop everything seen before the marker
+            remainder = marker_match.group(1)
+            if remainder:
+                output.append(remainder)
+            continue
+        output.append(line)
+
+    while output and not output[0].strip():
+        output.pop(0)
+    while output and not output[-1].strip():
+        output.pop()
+        trimmed_trailing += 1
+
+    result = "\n".join(output)
+    if trimmed_trailing == 1 and text.endswith(("\n", "\r")) and result:
+        result += "\n"
+    return result
 
 
 def llm_translate_single(

@@ -256,6 +256,44 @@ class TranslationWhitespaceTests(unittest.TestCase):
 
         self.assertEqual(translated_pairs, [("1", "Salut"), ("2", "Monde")])
 
+    def test_llm_translate_single_drops_content_before_marker(self):
+        with mock.patch(
+            "setzer_core._perform_llm_call",
+            return_value="Original text\nTranslation:\nBonjour",
+        ):
+            translated = setzer_core.llm_translate_single(
+                "Hello",
+                source="en",
+                target="fr",
+                model="gemma",
+                server="http://example",
+                translate_bracketed=True,
+                llm_mode="chat",
+                stream=False,
+                timeout=10,
+            )
+
+        self.assertEqual(translated, "Bonjour")
+
+    def test_llm_translate_single_trims_outer_blank_lines(self):
+        with mock.patch(
+            "setzer_core._perform_llm_call",
+            return_value="\n\nSalut\n\n",
+        ):
+            translated = setzer_core.llm_translate_single(
+                "Hello",
+                source="en",
+                target="fr",
+                model="gemma",
+                server="http://example",
+                translate_bracketed=True,
+                llm_mode="chat",
+                stream=False,
+                timeout=10,
+            )
+
+        self.assertEqual(translated, "Salut")
+
 
 if __name__ == "__main__":
     unittest.main()
