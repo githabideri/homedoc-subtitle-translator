@@ -1,0 +1,26 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+.venv*/
+
+# Editor and OS cruft
+.DS_Store
+Thumbs.db
+
+# Logs and raw LLM payloads
+homedoc.log
+llm_raw.txt
+
+# CLI output directories
+out/
+results/
+translations/
