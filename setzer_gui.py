@@ -106,13 +106,15 @@ class App:
         frame.rowconfigure(11, weight=2)
 
         preview_label = tk.Label(frame, text="CLI preview")
-        preview_label.grid(row=12, column=0, sticky="w", pady=(6, 0))
-        preview_entry = tk.Entry(
+        preview_label.grid(row=12, column=0, sticky="nw", pady=(6, 0))
+        self.cli_preview_widget = scrolledtext.ScrolledText(
             frame,
-            textvariable=self.cli_preview_var,
-            state="readonly",
+            height=5,
+            wrap="word",
+            state=tk.DISABLED,
         )
-        preview_entry.grid(row=12, column=1, columnspan=2, sticky="ew", pady=(6, 0))
+        self.cli_preview_widget.grid(row=12, column=1, columnspan=2, sticky="nsew", pady=(6, 0))
+        frame.rowconfigure(12, weight=0)
 
     def _register_variable_traces(self) -> None:
         variables: List[tk.Variable] = [
@@ -134,7 +136,12 @@ class App:
             self._trace_tokens.append(token)
 
     def _update_cli_preview(self, *_: object) -> None:
-        self.cli_preview_var.set(self._format_cli_command())
+        command = self._format_cli_command()
+        self.cli_preview_var.set(command)
+        self.cli_preview_widget.configure(state=tk.NORMAL)
+        self.cli_preview_widget.delete("1.0", tk.END)
+        self.cli_preview_widget.insert("1.0", command)
+        self.cli_preview_widget.configure(state=tk.DISABLED)
 
     def _format_cli_command(self) -> str:
         args: List[str] = ["python", "-m", "setzer_cli"]
