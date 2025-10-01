@@ -1,4 +1,14 @@
-# homedoc-subtitle-translator
+# General Info
+
+Part of the HomeDoc scripts that query local computer or network feature, parses its content and produces a small (local) LLM enhanced report; HomeDoc — Subtitle Translator, or short setzer (Übersetzer - translator - in German) takes a given subtitle file and will translate it from any language into any other language with the use of a local LLM (the quality and capability depends on the respective model though). Many options for custom output available!
+
+# Disclaimer
+
+This and other scripts (as well as accompanying texts/files/documentation) are written by (mostly) GPT-5, so be aware of potential security issues or plain nonsense; never run code that you haven't inspected. I tried to minimize the potential damage by sticking to the very simple approach of single file scripts (or in this case triple file scripts) with as little dependencies as possible.
+
+If you want to commit, feel free to fork, mess around and put "ai slop" on my "ai slop", or maybe deslop it enirely, but there is no garantuee that I will incorporate changes.
+
+# HomeDoc — Subtitle Translator (nickname setzer)
 
 Translate `.srt`, `.vtt`, and `.tsv` subtitle files with a local Ollama-compatible
 large language model. The project follows the homedoc toolkit style with a
