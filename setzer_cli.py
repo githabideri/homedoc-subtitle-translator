@@ -17,7 +17,7 @@ from setzer_core import (
     translate_range,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 
 def _env_bool(name: str, default: bool) -> bool:
