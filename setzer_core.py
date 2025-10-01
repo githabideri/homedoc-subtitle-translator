@@ -431,6 +431,10 @@ def _extract_stream_piece(payload: Dict[str, object]) -> str:
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _BRACKET_RE = re.compile(r"\[[^\]]+\]")
+_LEADING_MARKER_RE = re.compile(
+    r"^\s*(?:CUE|OUTPUT|TRANSLATION|TRANSLATED|RESPONSE|ANSWER)\s*:\s*",
+    re.IGNORECASE,
+)
 
 
 def _protect_tags(text: str) -> Tuple[str, Dict[str, str]]:
@@ -463,6 +467,21 @@ def _restore_placeholders(text: str, mapping: Dict[str, str]) -> str:
     for placeholder, value in mapping.items():
         text = text.replace(placeholder, value)
     return text
+
+
+def _cleanup_translation(text: str) -> str:
+    if not text:
+        return text
+
+    cleaned = text.lstrip("\ufeff")
+    match = _LEADING_MARKER_RE.match(cleaned)
+    if match:
+        cleaned = cleaned[match.end():]
+        if cleaned.startswith("\r\n"):
+            cleaned = cleaned[2:]
+        elif cleaned.startswith("\n"):
+            cleaned = cleaned[1:]
+    return cleaned
 
 
 def llm_translate_single(
@@ -512,9 +531,10 @@ def llm_translate_single(
 
     if not raw_result:
         return text
-    if not raw_result.strip():
+    cleaned = _cleanup_translation(raw_result)
+    if not cleaned.strip():
         return text
-    return _restore_placeholders(raw_result, {**tag_map, **bracket_map})
+    return _restore_placeholders(cleaned, {**tag_map, **bracket_map})
 
 
 def llm_translate_batch(
@@ -582,7 +602,11 @@ def llm_translate_batch(
         if translated is None:
             restored = _restore_placeholders(prepared, {**tag_map, **bracket_map})
         else:
-            restored = _restore_placeholders(translated, {**tag_map, **bracket_map})
+            cleaned = _cleanup_translation(translated)
+            if not cleaned.strip():
+                restored = _restore_placeholders(prepared, {**tag_map, **bracket_map})
+            else:
+                restored = _restore_placeholders(cleaned, {**tag_map, **bracket_map})
         output.append((pid, restored))
     return output
 

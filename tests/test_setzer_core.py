@@ -216,6 +216,46 @@ class TranslationWhitespaceTests(unittest.TestCase):
 
         self.assertEqual(translated_pairs, [("1", "  Salut  "), ("2", "Monde")])
 
+    def test_llm_translate_single_strips_leading_markers(self):
+        with mock.patch(
+            "setzer_core._perform_llm_call",
+            return_value="CUE:\nBonjour",
+        ):
+            translated = setzer_core.llm_translate_single(
+                "Hello",
+                source="en",
+                target="fr",
+                model="gemma",
+                server="http://example",
+                translate_bracketed=True,
+                llm_mode="chat",
+                stream=False,
+                timeout=10,
+            )
+
+        self.assertEqual(translated, "Bonjour")
+
+    def test_llm_translate_batch_strips_inline_markers(self):
+        response = "1|||Translation: Salut\n2|||OUTPUT: Monde\n"
+
+        with mock.patch(
+            "setzer_core._perform_llm_call",
+            return_value=response,
+        ):
+            translated_pairs = setzer_core.llm_translate_batch(
+                [("1", "Hello"), ("2", "World")],
+                source="en",
+                target="fr",
+                model="gemma",
+                server="http://example",
+                llm_mode="chat",
+                stream=False,
+                timeout=10,
+                translate_bracketed=True,
+            )
+
+        self.assertEqual(translated_pairs, [("1", "Salut"), ("2", "Monde")])
+
 
 if __name__ == "__main__":
     unittest.main()
