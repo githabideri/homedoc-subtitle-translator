@@ -1,14 +1,17 @@
 """Optional Tk GUI for homedoc-subtitle-translator."""
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import queue
 import re
+import shlex
+import sys
 import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from setzer_core import (
     Chunk,
@@ -21,7 +24,13 @@ from setzer_core import (
 
 
 class App:
-    def __init__(self, root: tk.Tk) -> None:
+    def __init__(
+        self,
+        root: tk.Tk,
+        initial_args: Optional[argparse.Namespace] = None,
+        *,
+        force_gui_entry: bool = False,
+    ) -> None:
         self.root = root
         root.title("homedoc-subtitle-translator")
 
@@ -38,6 +47,8 @@ class App:
         self.stream_var = tk.BooleanVar(value=True)
         self.flat_var = tk.BooleanVar(value=False)
         self.no_llm_var = tk.BooleanVar(value=False)
+        self.cli_preview_var = tk.StringVar()
+        self.use_gui_entry_var = tk.BooleanVar(value=force_gui_entry)
 
         self.log_queue: "queue.Queue[str]" = queue.Queue()
         self.transcript: Optional[Transcript] = None
@@ -45,8 +56,14 @@ class App:
         self.abort_event = threading.Event()
         self.worker: Optional[threading.Thread] = None
         self.input_path: Optional[Path] = None
+        self._trace_tokens: List[str] = []
+
+        if initial_args is not None:
+            self._apply_initial_settings(initial_args)
 
         self._build_layout()
+        self._register_variable_traces()
+        self._update_cli_preview()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(150, self._drain_logs)
 
@@ -99,6 +116,128 @@ class App:
         self.console = scrolledtext.ScrolledText(frame, height=12, state=tk.DISABLED)
         self.console.grid(row=11, column=0, columnspan=3, sticky="nsew")
         frame.rowconfigure(11, weight=2)
+
+        preview_header = tk.Frame(frame)
+        preview_header.grid(row=12, column=0, columnspan=3, sticky="w", pady=(6, 0))
+        tk.Label(preview_header, text="CLI preview").pack(side=tk.LEFT)
+        tk.Checkbutton(
+            preview_header,
+            text="Use setzer-gui entry point",
+            variable=self.use_gui_entry_var,
+        ).pack(side=tk.LEFT, padx=(10, 0))
+
+        self.cli_preview_widget = scrolledtext.ScrolledText(
+            frame,
+            height=5,
+            wrap="word",
+            state=tk.DISABLED,
+        )
+        self.cli_preview_widget.grid(row=13, column=0, columnspan=3, sticky="nsew")
+        frame.rowconfigure(13, weight=0)
+
+    def _register_variable_traces(self) -> None:
+        variables: List[tk.Variable] = [
+            self.input_var,
+            self.output_var,
+            self.source_var,
+            self.target_var,
+            self.server_var,
+            self.model_var,
+            self.cues_per_request_var,
+            self.max_chars_var,
+            self.bracket_var,
+            self.stream_var,
+            self.flat_var,
+            self.no_llm_var,
+            self.use_gui_entry_var,
+        ]
+        for var in variables:
+            token = var.trace_add("write", self._update_cli_preview)
+            self._trace_tokens.append(token)
+
+    def _apply_initial_settings(self, args: argparse.Namespace) -> None:
+        if getattr(args, "input_path", None):
+            self.input_var.set(args.input_path)
+        if getattr(args, "output_dir", None):
+            self.output_var.set(args.output_dir)
+        if getattr(args, "source", None):
+            self.source_var.set(args.source)
+        if getattr(args, "target", None):
+            self.target_var.set(args.target)
+        if getattr(args, "server", None):
+            self.server_var.set(args.server)
+        if getattr(args, "model", None):
+            self.model_var.set(args.model)
+        if getattr(args, "cues_per_request", None) is not None:
+            try:
+                self.cues_per_request_var.set(int(args.cues_per_request))
+            except (TypeError, ValueError):
+                pass
+        if getattr(args, "max_chars", None) is not None:
+            try:
+                self.max_chars_var.set(int(args.max_chars))
+            except (TypeError, ValueError):
+                pass
+        if getattr(args, "flat", None) is not None:
+            self.flat_var.set(bool(args.flat))
+        if getattr(args, "translate_bracketed", None) is not None:
+            self.bracket_var.set(bool(args.translate_bracketed))
+        if getattr(args, "stream", None) is not None:
+            self.stream_var.set(bool(args.stream))
+        if getattr(args, "no_llm", False):
+            self.no_llm_var.set(True)
+
+    def _update_cli_preview(self, *_: object) -> None:
+        command = self._format_cli_command()
+        self.cli_preview_var.set(command)
+        self.cli_preview_widget.configure(state=tk.NORMAL)
+        self.cli_preview_widget.delete("1.0", tk.END)
+        self.cli_preview_widget.insert("1.0", command)
+        self.cli_preview_widget.configure(state=tk.DISABLED)
+
+    def _format_cli_command(self) -> str:
+        command_name = "setzer-gui" if self.use_gui_entry_var.get() else "setzer"
+        args: List[str] = [command_name]
+
+        input_path = self.input_var.get().strip() or "<input.srt>"
+        output_dir = self.output_var.get().strip() or "<output-directory>"
+        args.extend(["--in", input_path])
+        args.extend(["--out", output_dir])
+
+        source = self.source_var.get().strip() or "auto"
+        target = self.target_var.get().strip() or "English"
+        server = self.server_var.get().strip() or "http://127.0.0.1:11434"
+        model = self.model_var.get().strip() or "gemma3:12b"
+        cues = max(1, int(self.cues_per_request_var.get() or 1))
+        max_chars = max(1, int(self.max_chars_var.get() or 4000))
+
+        args.extend(["--source", source])
+        args.extend(["--target", target])
+        args.extend(["--server", server])
+        args.extend(["--model", model])
+        args.extend(["--cues-per-request", str(cues)])
+        args.extend(["--max-chars", str(max_chars)])
+
+        if self.flat_var.get():
+            args.append("--flat")
+        else:
+            args.append("--no-flat")
+
+        if not self.bracket_var.get():
+            args.append("--no-translate-bracketed")
+
+        if self.stream_var.get():
+            args.append("--stream")
+        else:
+            args.append("--no-stream")
+
+        args.extend(["--llm-mode", "auto"])
+        args.extend(["--timeout", "60"])
+
+        if self.no_llm_var.get():
+            args.append("--no-llm")
+
+        return shlex.join(args)
 
     def _browse_input(self) -> None:
         filename = filedialog.askopenfilename(filetypes=[("Subtitles", "*.srt *.vtt *.tsv"), ("All", "*.*")])
@@ -304,9 +443,56 @@ class App:
         self.root.destroy()
 
 
-def main() -> None:
+def _build_gui_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Launch the homedoc subtitle GUI with optional preset values.",
+    )
+    parser.add_argument("--in", dest="input_path", help="Input subtitle file path")
+    parser.add_argument("--out", dest="output_dir", help="Output directory path")
+    parser.add_argument("--source", help="Source language override")
+    parser.add_argument("--target", help="Target language override")
+    parser.add_argument("--server", help="LLM server URL")
+    parser.add_argument("--model", help="LLM model tag")
+    parser.add_argument("--cues-per-request", type=int, dest="cues_per_request")
+    parser.add_argument("--max-chars", type=int, dest="max_chars")
+
+    flat_group = parser.add_mutually_exclusive_group()
+    flat_group.add_argument("--flat", dest="flat", action="store_const", const=True)
+    flat_group.add_argument("--no-flat", dest="flat", action="store_const", const=False)
+
+    bracket_group = parser.add_mutually_exclusive_group()
+    bracket_group.add_argument(
+        "--translate-bracketed",
+        dest="translate_bracketed",
+        action="store_const",
+        const=True,
+    )
+    bracket_group.add_argument(
+        "--no-translate-bracketed",
+        dest="translate_bracketed",
+        action="store_const",
+        const=False,
+    )
+
+    stream_group = parser.add_mutually_exclusive_group()
+    stream_group.add_argument("--stream", dest="stream", action="store_const", const=True)
+    stream_group.add_argument("--no-stream", dest="stream", action="store_const", const=False)
+
+    parser.add_argument("--llm-mode", choices=["auto", "generate", "chat"])
+    parser.add_argument("--timeout", type=float)
+    parser.add_argument("--no-llm", action="store_true")
+
+    parser.set_defaults(flat=None, translate_bracketed=None, stream=None)
+    return parser
+
+
+def main(argv: Optional[Sequence[str]] = None) -> None:
+    if argv is None:
+        argv = sys.argv[1:]
+    parser = _build_gui_parser()
+    args = parser.parse_args(argv)
     root = tk.Tk()
-    app = App(root)
+    app = App(root, args if argv else None, force_gui_entry=bool(argv))
     root.mainloop()
 
 
