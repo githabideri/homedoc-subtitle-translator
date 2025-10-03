@@ -3,11 +3,13 @@
 ![Version](https://img.shields.io/badge/version-0.1.2-blue?style=flat-square)
 ![License](https://img.shields.io/badge/license-GPL--3.0--or--later-brightgreen?style=flat-square)
 
-Part of the HomeDoc scripts that use Ollama-compatible large language models to do useful work completely local. HomeDoc — Subtitle Translator aka setzer (from "Übersetzer" - translator - in German) translates subtitle files (`.srt`, `.vtt`, and `.tsv`) from any language into any other language, although the quality and capability depends on the respective model. The project follows the homedoc toolkit style with a CLI-first workflow and an optional Tk GUI wrapper. The settings are displayed in GUI and can be either used in CLI workflow or to load old setting. It should work on all platforms (Linux, MacOS and Windows) as long as you have Ollama API accessible (either on the machine itself or on LAN).
+Do useful work fully locally with Ollama-compatible large language models. No cloud needed.
 
-<img width="600" alt="Screenshot of the HomeDoc - subtitle translator aka setzer version 0.1.2" src="https://github.com/user-attachments/assets/ba02816c-7018-45cd-910f-97b906a8a491" />
+HomeDoc — Subtitle Translator aka setzer (from "Übersetzer" - translator - in German) translates subtitle files (`.srt`, `.vtt`, and `.tsv`) from any language into any other language, although the quality and capability depends on the respective model. The project follows the homedoc toolkit style with a CLI-first workflow and an optional Tk GUI wrapper. The settings are displayed in GUI and can be either used in CLI workflow or to load old setting. It should work on all platforms (Linux, MacOS and Windows) as long as you have Ollama API accessible (either on the machine itself or on LAN).
 
-This is how the GUI looks like in (Feodra Linux) Cinnamon, while being busy chugging through the Czechoslovak classic "Král Šumavy" to produce some lovely německy subtitles.
+<img width="600" alt="Screenshot of the HomeDoc - subtitle translator aka setzer version 0.1.2" src="https://github.com/user-attachments/assets/69cda40d-a494-48b6-9896-f75dfd66d447" />
+
+This is how the GUI looks like in (Fedora Linux) Cinnamon, while being busy chugging through the Czechoslovak classic "Král Šumavy" to produce some lovely německy subtitles.
 
 # Disclaimer
 
