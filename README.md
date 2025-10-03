@@ -8,7 +8,10 @@ This and other scripts (as well as accompanying texts/files/documentation) are w
 
 If you want to commit, feel free to fork, mess around and put "ai slop" on my "ai slop", or maybe deslop it enirely, but there is no garantuee that I will incorporate changes.
 
-# HomeDoc — Subtitle Translator (nickname setzer)
+# HomeDoc — Subtitle Translator aka setzer
+
+![Version](https://img.shields.io/badge/version-0.1.2-blue?style=flat-square)
+![License](https://img.shields.io/badge/license-GPL--3.0--or--later-brightgreen?style=flat-square)
 
 Translate `.srt`, `.vtt`, and `.tsv` subtitle files with a local Ollama-compatible
 large language model. The project follows the homedoc toolkit style with a

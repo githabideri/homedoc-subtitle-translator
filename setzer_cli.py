@@ -18,7 +18,7 @@ from setzer_core import (
     translate_range,
 )
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 DEFAULT_OUTFILE_TEMPLATE = "{basename}.{dst}.{fmt}"
 
