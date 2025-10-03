@@ -11,9 +11,10 @@ from typing import Callable, List, Optional
 from setzer_core import (
     Chunk,
     Transcript,
-    build_output,
+    build_output_as,
     make_chunks,
     read_transcript,
+    resolve_outfile,
     translate_range,
 )
 
@@ -88,6 +89,19 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="flat",
         action="store_false",
         help="Write into timestamped folder within --out (default)",
+    )
+    parser.add_argument(
+        "--outfmt",
+        choices=["auto", "srt", "vtt", "tsv"],
+        default="auto",
+        help="Output subtitle format (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--outfile",
+        help=(
+            "Output template supporting {basename}, {src}, {dst}, {fmt}, {ts}"
+            " (relative paths resolve inside the output directory)"
+        ),
     )
     parser.add_argument("--source", default="auto", help="Source language (default: %(default)s)")
     parser.add_argument("--target", default="English", help="Target language (default: %(default)s)")
@@ -193,14 +207,6 @@ def _write_file(path: Path, content: str) -> None:
         raise RuntimeError(f"Unable to write {path.name}: {exc}") from exc
 
 
-def _output_filename(fmt: str) -> str:
-    mapping = {"srt": "report.srt", "vtt": "report.vtt", "tsv": "report.tsv"}
-    try:
-        return mapping[fmt]
-    except KeyError as exc:
-        raise RuntimeError(f"Unknown transcript format: {fmt}") from exc
-
-
 def main(argv: Optional[List[str]] = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -257,15 +263,40 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     timestamp = dt.datetime.now(dt.timezone.utc).astimezone()
     vtt_note = f"translated-with model={args.model} time={timestamp.isoformat()}"
+    target_fmt = args.outfmt if args.outfmt != "auto" else transcript.fmt
     try:
-        result = build_output(transcript, vtt_note=vtt_note if transcript.fmt == "vtt" else None)
+        result = build_output_as(
+            transcript,
+            target_fmt,
+            vtt_note=vtt_note if target_fmt == "vtt" else None,
+        )
     except Exception as exc:
         logger.log(f"Failed to render output: {exc}")
         logger.close()
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    output_path = target_dir / _output_filename(transcript.fmt)
+    if args.outfile:
+        template = args.outfile
+        if not os.path.isabs(template):
+            template = str((target_dir / template))
+    else:
+        template = str(target_dir / "{basename}.{dst}.{fmt}")
+
+    try:
+        output_path = resolve_outfile(
+            template,
+            input_path,
+            args.source,
+            args.target,
+            target_fmt,
+        )
+    except Exception as exc:
+        logger.log(f"Failed to resolve output filename: {exc}")
+        logger.close()
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
     try:
         _write_file(output_path, result)
     except Exception as exc:

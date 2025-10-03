@@ -1,6 +1,9 @@
 import unittest
 from unittest import mock
 
+import tempfile
+from pathlib import Path
+
 import setzer_core
 from setzer_core import Cue, _apply_batch
 
@@ -301,6 +304,84 @@ class TranslationWhitespaceTests(unittest.TestCase):
     def test_cleanup_translation_collapses_extra_blank_lines(self):
         text = "First\n\n\nSecond"
         self.assertEqual(setzer_core._cleanup_translation(text), "First\n\nSecond")
+
+
+class OutputHelpersTests(unittest.TestCase):
+    def setUp(self):
+        self.transcript = setzer_core.Transcript(
+            fmt="srt",
+            cues=[
+                Cue(
+                    index=1,
+                    start="00:00:00,000",
+                    end="00:00:01,000",
+                    text="Hello",
+                )
+            ],
+        )
+
+    def test_build_output_as_handles_formats(self):
+        srt_text = setzer_core.build_output_as(self.transcript, "srt")
+        self.assertIn("Hello", srt_text)
+
+        vtt_text = setzer_core.build_output_as(
+            self.transcript,
+            "vtt",
+            vtt_note="note=demo",
+        )
+        self.assertTrue(vtt_text.startswith("WEBVTT"))
+        self.assertIn("NOTE note=demo", vtt_text)
+
+        tsv_text = setzer_core.build_output_as(self.transcript, "tsv")
+        self.assertIn("Hello", tsv_text)
+
+    def test_resolve_outfile_replaces_placeholders(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = str(Path(tmpdir) / "{basename}.{dst}.{fmt}")
+            input_path = Path(tmpdir) / "clip.srt"
+            resolved = setzer_core.resolve_outfile(
+                template,
+                input_path,
+                "en",
+                "fr",
+                "vtt",
+            )
+            self.assertTrue(resolved.parent.exists())
+            self.assertTrue(str(resolved).endswith("clip.fr.vtt"))
+
+    def test_resolve_outfile_appends_counter(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = str(Path(tmpdir) / "{basename}.{dst}.{fmt}")
+            input_path = Path(tmpdir) / "clip.srt"
+            first = setzer_core.resolve_outfile(
+                template,
+                input_path,
+                "en",
+                "fr",
+                "srt",
+            )
+            first.write_text("stub", encoding="utf-8")
+            second = setzer_core.resolve_outfile(
+                template,
+                input_path,
+                "en",
+                "fr",
+                "srt",
+            )
+            self.assertTrue(second.name.startswith(first.stem + "-1"))
+
+    def test_resolve_outfile_renders_timestamp(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            template = str(Path(tmpdir) / "{basename}.{dst}.{fmt}.{ts}")
+            input_path = Path(tmpdir) / "clip.srt"
+            resolved = setzer_core.resolve_outfile(
+                template,
+                input_path,
+                "en",
+                "fr",
+                "srt",
+            )
+            self.assertRegex(resolved.name, r"clip\.fr\.srt\.\d{8}-\d{6}")
 
 
 class MakeChunksTests(unittest.TestCase):

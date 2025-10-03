@@ -14,9 +14,10 @@ from typing import List, Optional
 from setzer_core import (
     Chunk,
     Transcript,
-    build_output,
+    build_output_as,
     make_chunks,
     read_transcript,
+    resolve_outfile,
     translate_range,
 )
 
@@ -35,6 +36,8 @@ class App:
         self.model_var = tk.StringVar(value="gemma3:12b")
         self.cues_per_request_var = tk.IntVar(value=1)
         self.max_chars_var = tk.IntVar(value=4000)
+        self.outfmt_var = tk.StringVar(value="auto")
+        self.outfile_var = tk.StringVar(value="")
         self.bracket_var = tk.BooleanVar(value=True)
         self.stream_var = tk.BooleanVar(value=True)
         self.flat_var = tk.BooleanVar(value=False)
@@ -50,6 +53,7 @@ class App:
         self._trace_tokens: List[str] = []
 
         self._build_layout()
+        self._update_placeholder_hint()
         self._register_variable_traces()
         self._update_cli_preview()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -83,38 +87,51 @@ class App:
         add_row("Cues/request", cues_spin, 6)
         add_row("Max chars", tk.Entry(frame, textvariable=self.max_chars_var), 7)
 
+        fmt_menu = tk.OptionMenu(frame, self.outfmt_var, "auto", "srt", "vtt", "tsv")
+        add_row("Output fmt", fmt_menu, 8)
+
+        template_entry = tk.Entry(frame, textvariable=self.outfile_var)
+        add_row("File template", template_entry, 9)
+
+        self.placeholder_label = tk.Label(
+            frame,
+            text="Placeholders: {basename} {src} {dst} {fmt} {ts}",
+            fg="#555555",
+        )
+        self.placeholder_label.grid(row=10, column=0, columnspan=3, sticky="w")
+
         options_frame = tk.Frame(frame)
-        options_frame.grid(row=8, column=0, columnspan=3, sticky="w", pady=(4, 4))
+        options_frame.grid(row=11, column=0, columnspan=3, sticky="w", pady=(4, 4))
         tk.Checkbutton(options_frame, text="Translate bracketed", variable=self.bracket_var).pack(side=tk.LEFT)
         tk.Checkbutton(options_frame, text="Stream", variable=self.stream_var).pack(side=tk.LEFT, padx=(10, 0))
         tk.Checkbutton(options_frame, text="Flat output", variable=self.flat_var).pack(side=tk.LEFT, padx=(10, 0))
         tk.Checkbutton(options_frame, text="Dry run (no LLM)", variable=self.no_llm_var).pack(side=tk.LEFT, padx=(10, 0))
 
         self.chunk_list = tk.Listbox(frame, height=6)
-        frame.rowconfigure(9, weight=1)
-        self.chunk_list.grid(row=9, column=0, columnspan=3, sticky="nsew", pady=(6, 6))
+        frame.rowconfigure(12, weight=1)
+        self.chunk_list.grid(row=12, column=0, columnspan=3, sticky="nsew", pady=(6, 6))
 
         button_frame = tk.Frame(frame)
-        button_frame.grid(row=10, column=0, columnspan=3, sticky="ew", pady=(4, 4))
+        button_frame.grid(row=13, column=0, columnspan=3, sticky="ew", pady=(4, 4))
         tk.Button(button_frame, text="Build/Update chunks", command=self.build_chunks).pack(side=tk.LEFT)
         tk.Button(button_frame, text="Translate ALL", command=self.translate_all).pack(side=tk.LEFT, padx=(6, 0))
         tk.Button(button_frame, text="Translate selected chunk", command=self.translate_selected).pack(side=tk.LEFT, padx=(6, 0))
         tk.Button(button_frame, text="Abort", command=self.abort).pack(side=tk.LEFT, padx=(6, 0))
 
         self.console = scrolledtext.ScrolledText(frame, height=12, state=tk.DISABLED)
-        self.console.grid(row=11, column=0, columnspan=3, sticky="nsew")
-        frame.rowconfigure(11, weight=2)
+        self.console.grid(row=14, column=0, columnspan=3, sticky="nsew")
+        frame.rowconfigure(14, weight=2)
 
         preview_label = tk.Label(frame, text="CLI preview")
-        preview_label.grid(row=12, column=0, sticky="nw", pady=(6, 0))
+        preview_label.grid(row=15, column=0, sticky="nw", pady=(6, 0))
         self.cli_preview_widget = scrolledtext.ScrolledText(
             frame,
             height=5,
             wrap="word",
             state=tk.DISABLED,
         )
-        self.cli_preview_widget.grid(row=12, column=1, columnspan=2, sticky="nsew", pady=(6, 0))
-        frame.rowconfigure(12, weight=0)
+        self.cli_preview_widget.grid(row=15, column=1, columnspan=2, sticky="nsew", pady=(6, 0))
+        frame.rowconfigure(15, weight=0)
 
     def _register_variable_traces(self) -> None:
         variables: List[tk.Variable] = [
@@ -126,14 +143,18 @@ class App:
             self.model_var,
             self.cues_per_request_var,
             self.max_chars_var,
+            self.outfmt_var,
+            self.outfile_var,
             self.bracket_var,
             self.stream_var,
-            self.flat_var,
             self.no_llm_var,
         ]
         for var in variables:
             token = var.trace_add("write", self._update_cli_preview)
             self._trace_tokens.append(token)
+
+        flat_token = self.flat_var.trace_add("write", self._on_flat_toggle)
+        self._trace_tokens.append(flat_token)
 
     def _update_cli_preview(self, *_: object) -> None:
         command = self._format_cli_command()
@@ -142,6 +163,18 @@ class App:
         self.cli_preview_widget.delete("1.0", tk.END)
         self.cli_preview_widget.insert("1.0", command)
         self.cli_preview_widget.configure(state=tk.DISABLED)
+
+    def _on_flat_toggle(self, *_: object) -> None:
+        self._update_cli_preview()
+        self._update_placeholder_hint()
+
+    def _update_placeholder_hint(self) -> None:
+        if getattr(self, "placeholder_label", None) is None:
+            return
+        if self.flat_var.get():
+            self.placeholder_label.grid()
+        else:
+            self.placeholder_label.grid_remove()
 
     def _format_cli_command(self) -> str:
         args: List[str] = ["python", "-m", "setzer_cli"]
@@ -164,6 +197,14 @@ class App:
         args.extend(["--model", model])
         args.extend(["--cues-per-request", str(cues)])
         args.extend(["--max-chars", str(max_chars)])
+
+        outfmt = self.outfmt_var.get().strip() or "auto"
+        if outfmt != "auto":
+            args.extend(["--outfmt", outfmt])
+
+        outfile = self.outfile_var.get().strip()
+        if outfile:
+            args.extend(["--outfile", outfile])
 
         if self.flat_var.get():
             args.append("--flat")
@@ -323,12 +364,47 @@ class App:
         timestamp = dt.datetime.now(dt.timezone.utc).astimezone()
         target = self._resolve_output_directory(output_dir, flat, model_tag, timestamp)
         note = f"translated-with model={model_tag} time={timestamp.isoformat()}"
-        content = build_output(self.transcript, vtt_note=note if self.transcript.fmt == "vtt" else None)
-        filename = self._output_filename(self.transcript.fmt)
-        path = target / filename
+        fmt_choice = self.outfmt_var.get().strip() or "auto"
+        target_fmt = fmt_choice if fmt_choice != "auto" else self.transcript.fmt
         try:
-            path.write_text(content, encoding="utf-8")
-            self.log(f"Wrote output to {path}")
+            content = build_output_as(
+                self.transcript,
+                target_fmt,
+                vtt_note=note if target_fmt == "vtt" else None,
+            )
+        except Exception as exc:
+            self.log(f"Unable to render output: {exc}")
+            return
+
+        template = self.outfile_var.get().strip()
+        if template:
+            template_path = template
+            if not Path(template_path).is_absolute():
+                template_path = str(target / template_path)
+        else:
+            template_path = str(target / "{basename}.{dst}.{fmt}")
+
+        input_hint: Path | str
+        if self.input_path is not None:
+            input_hint = self.input_path
+        else:
+            input_hint = target / "output"
+
+        try:
+            resolved = resolve_outfile(
+                template_path,
+                input_hint,
+                self.source_var.get(),
+                self.target_var.get(),
+                target_fmt,
+            )
+        except Exception as exc:
+            self.log(f"Unable to resolve output filename: {exc}")
+            return
+
+        try:
+            resolved.write_text(content, encoding="utf-8")
+            self.log(f"Wrote output to {resolved}")
         except OSError as exc:
             self.log(f"Unable to write output: {exc}")
 
@@ -352,19 +428,6 @@ class App:
         target = base / folder
         target.mkdir(parents=True, exist_ok=True)
         return target
-
-    def _output_filename(self, fmt: str) -> str:
-        if self.input_path is not None:
-            base = self.input_path.stem
-        elif self.transcript is not None and self.transcript.cues:
-            base = f"job-{self.transcript.cues[0].index}"
-        else:
-            base = "output"
-        lang = self._language_code()
-        ext_map = {"srt": ".srt", "vtt": ".vtt", "tsv": ".tsv"}
-        ext = ext_map.get(fmt, ".txt")
-        suffix = f"_{lang}" if lang else ""
-        return f"{self._slugify(base)}{suffix}{ext}"
 
     def _language_code(self) -> str:
         target = self.target_var.get().strip()

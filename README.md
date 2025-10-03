@@ -43,6 +43,12 @@ setzer \
 
 # disable streaming
 setzer --in demo.vtt --out ./out --no-stream
+
+# custom output format and template
+setzer --in demo.vtt --out ./out --outfmt vtt --outfile "~/subs/{basename}.{dst}.{fmt}"
+
+# include timestamp in the output path
+setzer --in demo.vtt --out ./out --outfile "~/subs/{basename}.{dst}.{fmt}.{ts}"
 ```
 
 See [USAGE.md](USAGE.md) for the full flag reference and examples.
@@ -82,14 +88,17 @@ behaviour.
 
 ## Outputs
 
-Every CLI invocation writes:
+Every CLI invocation writes the translated subtitle file plus:
 
-- `report.<ext>` — rewritten subtitle file matching the input format.
 - `homedoc.log` — timestamped log of the run.
 - `llm_raw.txt` — raw LLM payloads when streaming or `--debug` is active.
 
-By default results are placed in `--out/<YYYYMMDD-HHMMSS>/`. Use `--flat` to
-write directly into the specified output directory.
+The main subtitle file defaults to `{basename}.{dst}.{fmt}` (input stem,
+target language, and chosen format). Use `--outfmt` to convert formats and
+`--outfile` to override the template. Available placeholders are
+`{basename}`, `{src}`, `{dst}`, `{fmt}`, and `{ts}` (local timestamp). When
+`--flat` is disabled the template is evaluated inside the timestamped
+subdirectory `--out/<YYYYMMDD-HHMMSS>/`.
 
 ## Notes & Safety
 

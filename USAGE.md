@@ -10,6 +10,8 @@ available through the `homedoc-subtitle-translator` alias as well.
 | `--in` | path | required | – | Input subtitle (`.srt`, `.vtt`, `.tsv`). |
 | `--out` | path | required | – | Output directory. |
 | `--flat` / `--no-flat` | bool | `--no-flat` | – | Write directly into `--out` or into a timestamped subfolder. |
+| `--outfmt` | choice | `auto` | – | Output format (`srt`, `vtt`, `tsv`, or `auto`). |
+| `--outfile` | text | `{basename}.{dst}.{fmt}` | – | Output template supporting `{basename}`, `{src}`, `{dst}`, `{fmt}`, `{ts}`. |
 | `--source` | text | `auto` | – | Source language hint. |
 | `--target` | text | `English` | – | Target language. |
 | `--cues-per-request` / `--batch-per-chunk` | int | `1` | `HOMEDOC_CUES_PER_REQUEST` | Subtitle cues per LLM request. |
@@ -27,7 +29,9 @@ available through the `homedoc-subtitle-translator` alias as well.
 Environment variables provide defaults when the related flags are omitted. If
 `HOMEDOC_STREAM` is `0` or `false`, streaming is disabled unless `--stream` is
 explicitly provided. When `HOMEDOC_TZ` is set, folder mode uses that timezone
-for the `<YYYYMMDD-HHMMSS>` output name.
+for the `<YYYYMMDD-HHMMSS>` output name. Without `--outfile`, the translated
+subtitle is written as `{basename}.{dst}.{fmt}` inside the resolved output
+directory; relative templates are interpreted within that directory.
 
 ## Examples
 
@@ -47,6 +51,18 @@ setzer --in drama.srt --out ./translated --server http://127.0.0.1:11434 --model
 
 ```bash
 setzer --in talk.vtt --out ./translated --flat
+```
+
+### Custom output format and template
+
+```bash
+setzer --in drama.srt --out ./translated --outfmt vtt --outfile "~/subs/{basename}.{dst}.{fmt}"
+```
+
+### Timestamped template example
+
+```bash
+setzer --in drama.srt --out ./translated --outfile "~/subs/{basename}.{dst}.{fmt}.{ts}"
 ```
 
 ### Batch mode

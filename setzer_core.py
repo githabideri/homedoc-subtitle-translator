@@ -10,6 +10,8 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -308,14 +310,68 @@ def write_tsv(transcript: Transcript) -> str:
     return buffer.getvalue()
 
 
-def build_output(transcript: Transcript, vtt_note: Optional[str] = None) -> str:
-    if transcript.fmt == "srt":
+def build_output_as(
+    transcript: Transcript, fmt: str, vtt_note: Optional[str] = None
+) -> str:
+    fmt = fmt.lower()
+    if fmt == "srt":
         return write_srt(transcript)
-    if transcript.fmt == "vtt":
+    if fmt == "vtt":
         return write_vtt(transcript, note=vtt_note)
-    if transcript.fmt == "tsv":
+    if fmt == "tsv":
         return write_tsv(transcript)
-    raise TranscriptError(f"Cannot build output for unknown format: {transcript.fmt}")
+    raise TranscriptError(f"Cannot build output for unknown format: {fmt}")
+
+
+def build_output(transcript: Transcript, vtt_note: Optional[str] = None) -> str:
+    return build_output_as(transcript, transcript.fmt, vtt_note=vtt_note)
+
+
+def resolve_outfile(
+    template: str,
+    input_path: Path | str,
+    src: str,
+    dst: str,
+    fmt: str,
+) -> Path:
+    base_path = Path(input_path) if input_path else Path("output")
+    basename = base_path.stem or "output"
+
+    def _slug(value: str, fallback: str) -> str:
+        cleaned = (value or "").strip()
+        if not cleaned:
+            cleaned = fallback
+        cleaned = cleaned.lower()
+        cleaned = re.sub(r"[^0-9a-z._-]+", "-", cleaned)
+        cleaned = re.sub(r"-{2,}", "-", cleaned)
+        cleaned = cleaned.strip("-_.")
+        return cleaned or fallback
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    replacements = {
+        "{basename}": basename,
+        "{src}": _slug(src, "src"),
+        "{dst}": _slug(dst, "dst"),
+        "{fmt}": _slug(fmt, "fmt"),
+        "{ts}": timestamp,
+    }
+
+    resolved = template
+    for key, value in replacements.items():
+        resolved = resolved.replace(key, value)
+
+    candidate = Path(resolved).expanduser()
+    parent = candidate.parent if candidate.parent != Path("") else Path(".")
+    parent.mkdir(parents=True, exist_ok=True)
+
+    stem = candidate.stem or "output"
+    suffix = "".join(candidate.suffixes)
+    attempt = candidate
+    counter = 1
+    while attempt.exists():
+        attempt = parent / f"{stem}-{counter}{suffix}"
+        counter += 1
+    return attempt
 
 
 def make_chunks(cues: List[Cue], max_chars: int) -> List[Chunk]:
