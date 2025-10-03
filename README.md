@@ -40,7 +40,7 @@ curl http://127.0.0.1:11434
 # alternatively open that link in browser, should display "Ollama is running" either way
 
 # fetch the sources
-git clone https://github.com/homedoc-ai/homedoc-subtitle-translator.git
+git clone https://github.com/githabideri/homedoc-subtitle-translator.git
 cd homedoc-subtitle-translator
 
 # install with pipx (recommended)
