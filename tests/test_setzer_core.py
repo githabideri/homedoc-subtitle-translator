@@ -1,8 +1,11 @@
+import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import setzer_core
-from setzer_core import Cue, _apply_batch
+from setzer_core import Cue, Transcript, _apply_batch, build_output_as, resolve_outfile
 
 
 class FakeStreamResponse:
@@ -301,6 +304,68 @@ class TranslationWhitespaceTests(unittest.TestCase):
     def test_cleanup_translation_collapses_extra_blank_lines(self):
         text = "First\n\n\nSecond"
         self.assertEqual(setzer_core._cleanup_translation(text), "First\n\nSecond")
+
+
+class BuildOutputAsTests(unittest.TestCase):
+    def setUp(self):
+        self.transcript = Transcript(
+            fmt="srt",
+            cues=[
+                Cue(index=1, start="00:00:01,000", end="00:00:02,000", text="Hello"),
+                Cue(index=2, start="00:00:02,000", end="00:00:03,000", text="World"),
+            ],
+            header="WEBVTT",
+        )
+
+    def test_build_output_as_vtt_includes_note(self):
+        note = "translated-with model=test"
+        output = build_output_as(self.transcript, "vtt", vtt_note=note)
+        lines = output.splitlines()
+        self.assertTrue(lines[0].startswith("WEBVTT"))
+        self.assertIn(f"NOTE {note}", output)
+
+    def test_build_output_as_tsv_has_header(self):
+        output = build_output_as(self.transcript, "tsv")
+        first_line = output.splitlines()[0]
+        self.assertEqual(first_line, "start\tend\ttext")
+
+    def test_build_output_as_rejects_unknown_format(self):
+        with self.assertRaises(setzer_core.TranscriptError):
+            build_output_as(self.transcript, "txt")
+
+
+class ResolveOutfileTests(unittest.TestCase):
+    def test_resolve_outfile_expands_placeholders_and_directories(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            template = tmp_path / "nested" / "{basename}.{dst}.{fmt}"
+            input_path = tmp_path / "movie.srt"
+            input_path.write_text("data", encoding="utf-8")
+
+            result = resolve_outfile(
+                str(template),
+                input_path,
+                "en",
+                "French",
+                "vtt",
+            )
+
+            self.assertTrue(result.parent.exists())
+            self.assertEqual(result.name, "movie.French.vtt")
+
+    def test_resolve_outfile_appends_counter_when_exists(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            base = Path(tmpdir)
+            template = base / "{basename}.{dst}.{fmt}"
+            input_path = base / "episode.vtt"
+            input_path.write_text("data", encoding="utf-8")
+
+            first = resolve_outfile(str(template), input_path, "en", "es", "srt")
+            first.write_text("one", encoding="utf-8")
+            second = resolve_outfile(str(template), input_path, "en", "es", "srt")
+
+            self.assertIn("-1", second.stem)
+            self.assertTrue(second.parent.exists())
 
 
 class MakeChunksTests(unittest.TestCase):

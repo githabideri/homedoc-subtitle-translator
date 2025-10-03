@@ -9,8 +9,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import datetime as dt
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, List, Optional, Tuple
+from pathlib import Path
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -308,14 +310,73 @@ def write_tsv(transcript: Transcript) -> str:
     return buffer.getvalue()
 
 
-def build_output(transcript: Transcript, vtt_note: Optional[str] = None) -> str:
-    if transcript.fmt == "srt":
+def build_output_as(transcript: Transcript, fmt: str, vtt_note: Optional[str] = None) -> str:
+    fmt = fmt.lower()
+    if fmt == "srt":
         return write_srt(transcript)
-    if transcript.fmt == "vtt":
+    if fmt == "vtt":
         return write_vtt(transcript, note=vtt_note)
-    if transcript.fmt == "tsv":
+    if fmt == "tsv":
         return write_tsv(transcript)
-    raise TranscriptError(f"Cannot build output for unknown format: {transcript.fmt}")
+    raise TranscriptError(f"Cannot build output for unknown format: {fmt}")
+
+
+def build_output(transcript: Transcript, vtt_note: Optional[str] = None) -> str:
+    note = vtt_note if transcript.fmt == "vtt" else None
+    return build_output_as(transcript, transcript.fmt, vtt_note=note)
+
+
+def resolve_outfile(
+    template: Union[str, Path],
+    input_path: Optional[Union[str, Path]],
+    src: str,
+    dst: str,
+    fmt: str,
+) -> Path:
+    path_template = Path(template) if isinstance(template, Path) else Path(str(template))
+
+    input_base: Optional[Path] = None
+    if input_path is not None and str(input_path):
+        input_base = Path(str(input_path))
+
+    basename = input_base.stem if input_base is not None else "output"
+    tokens = {
+        "basename": basename,
+        "src": _slugify_token(src) or "src",
+        "dst": _slugify_token(dst) or "dst",
+        "fmt": fmt.lower(),
+        "ts": dt.datetime.now().strftime("%Y%m%d-%H%M%S"),
+    }
+
+    try:
+        formatted = str(path_template).format(**tokens)
+    except KeyError as exc:
+        raise TranscriptError(f"Unknown placeholder in output template: {exc}") from exc
+
+    candidate = Path(formatted).expanduser()
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+
+    if not candidate.exists():
+        return candidate
+
+    suffix = "".join(candidate.suffixes)
+    base_name = candidate.name
+    if suffix:
+        base_name = base_name[: -len(suffix)]
+    counter = 1
+    while True:
+        new_name = f"{base_name}-{counter}{suffix}"
+        new_path = candidate.with_name(new_name)
+        if not new_path.exists():
+            return new_path
+        counter += 1
+
+
+def _slugify_token(text: str) -> str:
+    cleaned = re.sub(r"[\s]+", "_", str(text).strip())
+    cleaned = re.sub(r"[^0-9A-Za-z._-]", "-", cleaned)
+    cleaned = re.sub(r"[-_]{2,}", "_", cleaned)
+    return cleaned.strip("_-.")
 
 
 def make_chunks(cues: List[Cue], max_chars: int) -> List[Chunk]:

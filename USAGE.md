@@ -12,6 +12,8 @@ available through the `homedoc-subtitle-translator` alias as well.
 | `--flat` / `--no-flat` | bool | `--no-flat` | – | Write directly into `--out` or into a timestamped subfolder. |
 | `--source` | text | `auto` | – | Source language hint. |
 | `--target` | text | `English` | – | Target language. |
+| `--outfmt` | choice | `auto` | – | Output format override (`auto`, `srt`, `vtt`, `tsv`). |
+| `--outfile` | text | – | – | Output file template with placeholders `{basename}`, `{src}`, `{dst}`, `{fmt}`, `{ts}` (default `{basename}.{dst}.{fmt}`). |
 | `--cues-per-request` / `--batch-per-chunk` | int | `1` | `HOMEDOC_CUES_PER_REQUEST` | Subtitle cues per LLM request. |
 | `--max-chars` | int | `4000` | – | Planning size for chunk generation. |
 | `--no-translate-bracketed` | bool | disabled | – | Preserve bracketed tags such as `[MUSIC]`. |
@@ -47,6 +49,12 @@ setzer --in drama.srt --out ./translated --server http://127.0.0.1:11434 --model
 
 ```bash
 setzer --in talk.vtt --out ./translated --flat
+```
+
+### Custom output template
+
+```bash
+setzer --in talk.vtt --out ./translated --flat --outfmt srt --outfile "~/subs/{basename}.{dst}.{fmt}"
 ```
 
 ### Batch mode

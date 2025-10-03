@@ -43,6 +43,9 @@ setzer \
 
 # disable streaming
 setzer --in demo.vtt --out ./out --no-stream
+
+# custom output template and format override
+setzer --in drama.srt --out ./out --flat --outfmt vtt --outfile "~/subs/{basename}.{dst}.{fmt}"
 ```
 
 See [USAGE.md](USAGE.md) for the full flag reference and examples.
@@ -84,7 +87,10 @@ behaviour.
 
 Every CLI invocation writes:
 
-- `report.<ext>` — rewritten subtitle file matching the input format.
+- Translated subtitles following the `{basename}.{dst}.{fmt}` template by
+  default. Adjust with `--outfile` to include placeholders such as
+  `{basename}`, `{src}`, `{dst}`, `{fmt}`, and `{ts}` or to point to a custom
+  folder.
 - `homedoc.log` — timestamped log of the run.
 - `llm_raw.txt` — raw LLM payloads when streaming or `--debug` is active.
 

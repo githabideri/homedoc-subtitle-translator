@@ -4,20 +4,23 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Callable, List, Optional
 
 from setzer_core import (
     Chunk,
-    Transcript,
-    build_output,
+    build_output_as,
     make_chunks,
     read_transcript,
+    resolve_outfile,
     translate_range,
 )
 
 __version__ = "0.1.1"
+
+DEFAULT_OUTFILE_TEMPLATE = "{basename}.{dst}.{fmt}"
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -91,6 +94,18 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--source", default="auto", help="Source language (default: %(default)s)")
     parser.add_argument("--target", default="English", help="Target language (default: %(default)s)")
+    parser.add_argument(
+        "--outfmt",
+        choices=["auto", "srt", "vtt", "tsv"],
+        default="auto",
+        help="Output format (default: %(default)s matches input)",
+    )
+    parser.add_argument(
+        "--outfile",
+        help=(
+            "Output file template. Supports placeholders {basename}, {src}, {dst}, {fmt}, {ts}."
+        ),
+    )
     parser.add_argument(
         "--cues-per-request",
         "--batch-per-chunk",
@@ -193,12 +208,12 @@ def _write_file(path: Path, content: str) -> None:
         raise RuntimeError(f"Unable to write {path.name}: {exc}") from exc
 
 
-def _output_filename(fmt: str) -> str:
-    mapping = {"srt": "report.srt", "vtt": "report.vtt", "tsv": "report.tsv"}
-    try:
-        return mapping[fmt]
-    except KeyError as exc:
-        raise RuntimeError(f"Unknown transcript format: {fmt}") from exc
+def _language_token(label: str, fallback: str) -> str:
+    cleaned = re.sub(r"[\s]+", "_", label.strip())
+    cleaned = re.sub(r"[^0-9A-Za-z._-]", "-", cleaned)
+    cleaned = re.sub(r"[-_]{2,}", "_", cleaned)
+    result = cleaned.strip("_-.")
+    return result.lower() or fallback
 
 
 def main(argv: Optional[List[str]] = None) -> int:
@@ -257,15 +272,40 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     timestamp = dt.datetime.now(dt.timezone.utc).astimezone()
     vtt_note = f"translated-with model={args.model} time={timestamp.isoformat()}"
+    target_fmt = args.outfmt if args.outfmt != "auto" else transcript.fmt
     try:
-        result = build_output(transcript, vtt_note=vtt_note if transcript.fmt == "vtt" else None)
+        result = build_output_as(
+            transcript,
+            target_fmt,
+            vtt_note=vtt_note if target_fmt == "vtt" else None,
+        )
     except Exception as exc:
         logger.log(f"Failed to render output: {exc}")
         logger.close()
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    output_path = target_dir / _output_filename(transcript.fmt)
+    outfile_template = args.outfile if args.outfile else DEFAULT_OUTFILE_TEMPLATE
+    template_path: str
+    if outfile_template.startswith("~") or Path(outfile_template).is_absolute():
+        template_path = outfile_template
+    else:
+        template_path = str(target_dir / outfile_template)
+
+    try:
+        output_path = resolve_outfile(
+            template_path,
+            input_path,
+            _language_token(args.source or "auto", "auto"),
+            _language_token(args.target or "unknown", "unknown"),
+            target_fmt,
+        )
+    except Exception as exc:
+        logger.log(f"Failed to resolve output path: {exc}")
+        logger.close()
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
     try:
         _write_file(output_path, result)
     except Exception as exc:
@@ -274,7 +314,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    logger.log(f"Wrote output to {output_path}")
+    logger.log(f"Wrote {target_fmt.upper()} output to {output_path}")
 
     if args.debug or args.stream:
         raw_path = target_dir / "llm_raw.txt"
