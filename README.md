@@ -31,11 +31,13 @@ If you want to commit, feel free to fork, mess around and put "ai slop" on my "a
 ## Run or Install
 
 ```bash
-# verify python
+# verify python version (3.9 or higher)
 python3 --version
 
 # verify ollama accessibility (for local Ollama installation, change if needed)
-curl http://127.0.0.1:11434/api/tags
+curl http://127.0.0.1:11434
+
+# alternatively open that link in browser, should display "Ollama is running" either way
 
 # fetch the sources
 git clone https://github.com/homedoc-ai/homedoc-subtitle-translator.git
