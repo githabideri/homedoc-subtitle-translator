@@ -76,7 +76,7 @@ pip uninstall homedoc-subtitle-translator
 ## Usage
 
 The CLI keeps homedoc-style defaults: environment variables provide fallback
-values for the LLM server, model, and streaming options. Run `setzer --help` to
+values for the LLM server, model, and streaming options. Run `setzer --help` (or see [USAGE.md](USAGE.md)) to
 see all arguments, or the alias `homedoc-subtitle-translator` for the same
 behaviour.
 
@@ -92,7 +92,7 @@ Every CLI invocation writes:
 - `llm_raw.txt` — raw LLM payloads when streaming or `--debug` is active.
 
 By default results are placed in `--out/<YYYYMMDD-HHMMSS>/`. Use `--flat` to
-write directly into the specified output directory.
+only write output file into the specified output directory.
 
 ## Notes & Safety
 
