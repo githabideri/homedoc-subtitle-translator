@@ -1,21 +1,15 @@
-# General Info
-
-Part of the HomeDoc scripts that query local computer or network feature, parses its content and produces a small (local) LLM enhanced report; HomeDoc — Subtitle Translator, or short setzer (Übersetzer - translator - in German) takes a given subtitle file and will translate it from any language into any other language with the use of a local LLM (the quality and capability depends on the respective model though). Many options for custom output available!
-
-# Disclaimer
-
-This and other scripts (as well as accompanying texts/files/documentation) are written by (mostly) GPT-5, so be aware of potential security issues or plain nonsense; never run code that you haven't inspected. I tried to minimize the potential damage by sticking to the very simple approach of single file scripts (or in this case triple file scripts) with as little dependencies as possible.
-
-If you want to commit, feel free to fork, mess around and put "ai slop" on my "ai slop", or maybe deslop it enirely, but there is no garantuee that I will incorporate changes.
-
 # HomeDoc — Subtitle Translator aka setzer
 
 ![Version](https://img.shields.io/badge/version-0.1.2-blue?style=flat-square)
 ![License](https://img.shields.io/badge/license-GPL--3.0--or--later-brightgreen?style=flat-square)
 
-Translate `.srt`, `.vtt`, and `.tsv` subtitle files with a local Ollama-compatible
-large language model. The project follows the homedoc toolkit style with a
-CLI-first workflow and an optional Tk GUI wrapper.
+Part of the HomeDoc scripts that use Ollama-compatible large language models to do useful work completely local. HomeDoc — Subtitle Translator aka setzer (from "Übersetzer" - translator - in German) translates subtitle files (`.srt`, `.vtt`, and `.tsv`) from any language into any other language, although the quality and capability depends on the respective model. The project follows the homedoc toolkit style with a CLI-first workflow and an optional Tk GUI wrapper. The settings are displayed in GUI and can be either used in CLI workflow or to load old setting.
+
+# Disclaimer
+
+This and other scripts (as well as accompanying texts/files/documentation) are written by LLMs (mostly GPT-5), so be aware of potential security issues or plain nonsense; never run code that you haven't inspected. I tried to minimize the potential damage by sticking to the very simple approach of single file scripts (or in this case triple file scripts) with as little dependencies as possible.
+
+If you want to commit, feel free to fork, mess around and put "ai slop" on my "ai slop", or maybe deslop it enirely, but there is no garantuee that I will incorporate changes.
 
 ## Run or Install
 
