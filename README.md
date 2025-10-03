@@ -17,6 +17,17 @@ This and other scripts (as well as accompanying texts/files/documentation) are w
 
 If you want to commit, feel free to fork, mess around and put "ai slop" on my "ai slop", or maybe deslop it enirely, but there is no garantuee that I will incorporate changes.
 
+## Prerequisites
+
+- **Python 3.9** or newer (matches the package metadata in
+  `pyproject.toml`). Use your system interpreter or a virtual environment.
+- **Ollama-compatible server** accessible via HTTP, either from a local
+  Ollama installation (default `http://127.0.0.1:11434`) or a reachable host on
+  your LAN/WAN. Configure the URL with `--server` or the `SETZER_SERVER`
+  environment variable when running the CLI.
+
+
+
 ## Run or Install
 
 ```bash
