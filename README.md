@@ -1,18 +1,21 @@
-# General Info
+# HomeDoc — Subtitle Translator aka setzer
 
-Part of the HomeDoc scripts that query local computer or network feature, parses its content and produces a small (local) LLM enhanced report; HomeDoc — Subtitle Translator, or short setzer (Übersetzer - translator - in German) takes a given subtitle file and will translate it from any language into any other language with the use of a local LLM (the quality and capability depends on the respective model though). Many options for custom output available!
+![Version](https://img.shields.io/badge/version-0.1.2-blue?style=flat-square)
+![License](https://img.shields.io/badge/license-GPL--3.0--or--later-brightgreen?style=flat-square)
+
+Do useful work fully locally with Ollama-compatible large language models. No cloud needed.
+
+HomeDoc — Subtitle Translator aka setzer (from "Übersetzer" - translator - in German) translates subtitle files (`.srt`, `.vtt`, and `.tsv`) from any language into any other language, although the quality and capability depends on the respective model. The project follows the homedoc toolkit style with a CLI-first workflow and an optional Tk GUI wrapper. The settings are displayed in GUI and can be either used in CLI workflow or to load old setting. It should work on all platforms (Linux, MacOS and Windows) as long as you have Ollama API accessible (either on the machine itself or on LAN).
+
+<img width="600" alt="Screenshot of the HomeDoc - subtitle translator aka setzer version 0.1.2" src="https://github.com/user-attachments/assets/69cda40d-a494-48b6-9896-f75dfd66d447" />
+
+This is how the GUI looks like in (Fedora Linux) Cinnamon, while being busy chugging through the Czechoslovak classic "Král Šumavy" to produce some lovely německy subtitles.
 
 # Disclaimer
 
-This and other scripts (as well as accompanying texts/files/documentation) are written by (mostly) GPT-5, so be aware of potential security issues or plain nonsense; never run code that you haven't inspected. I tried to minimize the potential damage by sticking to the very simple approach of single file scripts (or in this case triple file scripts) with as little dependencies as possible.
+This and other scripts (as well as accompanying texts/files/documentation) are written by LLMs (mostly GPT-5), so be aware of potential security issues or plain nonsense; never run code that you haven't inspected. I tried to minimize the potential damage by sticking to the very simple approach of single file scripts (or in this case triple file scripts) with as little dependencies as possible.
 
 If you want to commit, feel free to fork, mess around and put "ai slop" on my "ai slop", or maybe deslop it enirely, but there is no garantuee that I will incorporate changes.
-
-# HomeDoc — Subtitle Translator (nickname setzer)
-
-Translate `.srt`, `.vtt`, and `.tsv` subtitle files with a local Ollama-compatible
-large language model. The project follows the homedoc toolkit style with a
-CLI-first workflow and an optional Tk GUI wrapper.
 
 ## Run or Install
 
@@ -79,7 +82,7 @@ pip uninstall homedoc-subtitle-translator
 ## Usage
 
 The CLI keeps homedoc-style defaults: environment variables provide fallback
-values for the LLM server, model, and streaming options. Run `setzer --help` to
+values for the LLM server, model, and streaming options. Run `setzer --help` (or see [USAGE.md](USAGE.md)) to
 see all arguments, or the alias `homedoc-subtitle-translator` for the same
 behaviour.
 
@@ -95,7 +98,7 @@ Every CLI invocation writes:
 - `llm_raw.txt` — raw LLM payloads when streaming or `--debug` is active.
 
 By default results are placed in `--out/<YYYYMMDD-HHMMSS>/`. Use `--flat` to
-write directly into the specified output directory.
+only write output file into the specified output directory.
 
 ## Notes & Safety
 
