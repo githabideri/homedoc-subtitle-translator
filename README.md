@@ -31,6 +31,16 @@ If you want to commit, feel free to fork, mess around and put "ai slop" on my "a
 ## Run or Install
 
 ```bash
+# verify python
+python3 --version
+
+# verify ollama accessibility (for local Ollama installation, change if needed)
+curl http://127.0.0.1:11434/api/tags
+
+# fetch the sources
+git clone https://github.com/homedoc-ai/homedoc-subtitle-translator.git
+cd homedoc-subtitle-translator
+
 # install with pipx (recommended)
 pipx install .
 
