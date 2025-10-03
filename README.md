@@ -11,7 +11,7 @@ HomeDoc — Subtitle Translator aka setzer (from "Übersetzer" - translator - in
 
 This is how the GUI looks like in (Fedora Linux) Cinnamon, while being busy chugging through the Czechoslovak classic "Král Šumavy" to produce some lovely německy subtitles.
 
-# Disclaimer
+## Disclaimer
 
 This and other scripts (as well as accompanying texts/files/documentation) are written by LLMs (mostly GPT-5), so be aware of potential security issues or plain nonsense; never run code that you haven't inspected. I tried to minimize the potential damage by sticking to the very simple approach of single file scripts (or in this case triple file scripts) with as little dependencies as possible.
 
