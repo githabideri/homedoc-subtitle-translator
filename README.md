@@ -5,6 +5,9 @@
 
 Part of the HomeDoc scripts that use Ollama-compatible large language models to do useful work completely local. HomeDoc — Subtitle Translator aka setzer (from "Übersetzer" - translator - in German) translates subtitle files (`.srt`, `.vtt`, and `.tsv`) from any language into any other language, although the quality and capability depends on the respective model. The project follows the homedoc toolkit style with a CLI-first workflow and an optional Tk GUI wrapper. The settings are displayed in GUI and can be either used in CLI workflow or to load old setting.
 
+<img width="1499" height="1612" alt="Screenshot of the HomeDoc - subtitle translator aka setzer version 0.1.2" src="https://github.com/user-attachments/assets/ba02816c-7018-45cd-910f-97b906a8a491" />
+This is how the GUI looks like in (Feodra Linux) Cinnamon, while being busy chugging through the Czechoslovak classic "Král Šumavy" to produce some lovely německy subtitles.
+
 # Disclaimer
 
 This and other scripts (as well as accompanying texts/files/documentation) are written by LLMs (mostly GPT-5), so be aware of potential security issues or plain nonsense; never run code that you haven't inspected. I tried to minimize the potential damage by sticking to the very simple approach of single file scripts (or in this case triple file scripts) with as little dependencies as possible.
